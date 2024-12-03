@@ -20,6 +20,13 @@ function App() {
   const [yearRange, setYearRange] = useState([1900, new Date().getFullYear()]);
   const [ratingRange, setRatingRange] = useState([0, 10]);
 
+  // Add new state for pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+
+  // Add new state for sorting
+  const [sortBy, setSortBy] = useState("none"); // 'none', 'topEarner', 'topLoser'
+
   // Fetch genres on component mount
   useEffect(() => {
     const fetchGenres = async () => {
@@ -57,23 +64,24 @@ function App() {
       let endpoint;
       switch (section) {
         case "trending":
-          endpoint = `${API_BASE_URL}/trending/${mediaType}/week?api_key=${API_KEY}`;
+          endpoint = `${API_BASE_URL}/trending/${mediaType}/week?api_key=${API_KEY}&page=${currentPage}`;
           break;
         case "top_rated":
-          endpoint = `${API_BASE_URL}/${mediaType}/top_rated?api_key=${API_KEY}`;
+          endpoint = `${API_BASE_URL}/${mediaType}/top_rated?api_key=${API_KEY}&page=${currentPage}`;
           break;
         case "upcoming":
           endpoint =
             mediaType === "movie"
-              ? `${API_BASE_URL}/movie/upcoming?api_key=${API_KEY}`
-              : `${API_BASE_URL}/tv/on_the_air?api_key=${API_KEY}`;
+              ? `${API_BASE_URL}/movie/upcoming?api_key=${API_KEY}&page=${currentPage}`
+              : `${API_BASE_URL}/tv/on_the_air?api_key=${API_KEY}&page=${currentPage}`;
           break;
         default:
-          endpoint = `${API_BASE_URL}/${mediaType}/popular?api_key=${API_KEY}`;
+          endpoint = `${API_BASE_URL}/${mediaType}/popular?api_key=${API_KEY}&page=${currentPage}`;
       }
 
       const response = await fetch(endpoint);
       const data = await response.json();
+      setTotalPages(Math.min(data.total_pages, 500)); // API limits to 500 pages max
       return data.results;
     } catch (error) {
       console.error(`Error fetching ${section} content:`, error);
@@ -91,12 +99,48 @@ function App() {
           const response = await fetch(
             `${API_BASE_URL}/search/${mediaType}?api_key=${API_KEY}&query=${encodeURIComponent(
               searchQuery
-            )}`
+            )}&page=${currentPage}`
           );
           const data = await response.json();
+          setTotalPages(Math.min(data.total_pages, 500));
           movies = data.results;
         } else {
           movies = await fetchMoviesBySection(activeSection);
+        }
+
+        // If sorting is enabled, fetch details for all movies to get budget/revenue info
+        if (sortBy !== "none" && mediaType === "movie") {
+          const moviesWithDetails = await Promise.all(
+            movies.map(async (movie) => {
+              const response = await fetch(
+                `${API_BASE_URL}/movie/${movie.id}?api_key=${API_KEY}&language=en-US`
+              );
+              const details = await response.json();
+              return {
+                ...movie,
+                budget: details.budget,
+                revenue: details.revenue,
+                roi:
+                  details.budget > 0
+                    ? ((details.revenue - details.budget) / details.budget) *
+                      100
+                    : null,
+              };
+            })
+          );
+
+          movies = moviesWithDetails.filter(
+            (movie) => movie.budget > 0 && movie.revenue > 0
+          );
+
+          // Sort by ROI
+          movies.sort((a, b) => {
+            if (sortBy === "topEarner") {
+              return b.roi - a.roi;
+            } else {
+              return a.roi - b.roi;
+            }
+          });
         }
 
         const formattedMovies = movies
@@ -124,6 +168,9 @@ function App() {
             poster: movie.poster_path
               ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
               : "https://via.placeholder.com/500x750?text=No+Poster",
+            roi: movie.roi,
+            budget: movie.budget,
+            revenue: movie.revenue,
           }));
 
         setMovies(formattedMovies);
@@ -139,7 +186,15 @@ function App() {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, activeSection, mediaType, yearRange, ratingRange]);
+  }, [
+    searchQuery,
+    activeSection,
+    mediaType,
+    yearRange,
+    ratingRange,
+    currentPage,
+    sortBy,
+  ]);
 
   // Get genre name from genre ID
   const getGenreName = (genreId) => {
@@ -174,8 +229,15 @@ function App() {
       const details = await detailsResponse.json();
       const credits = await creditsResponse.json();
 
+      // Calculate ROI
+      const roi =
+        details.budget > 0
+          ? ((details.revenue - details.budget) / details.budget) * 100
+          : null;
+
       setMovieDetails({
         ...details,
+        roi,
         cast: credits.cast.slice(0, 5),
         director:
           mediaType === "movie"
@@ -204,8 +266,18 @@ function App() {
   const movieDetailsModal = (
     <>
       {showDetailsModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-gray-800 rounded-xl w-full max-w-4xl shadow-2xl relative my-4 sm:my-8">
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto"
+          onClick={() => {
+            setShowDetailsModal(false);
+            setSelectedMovie(null);
+            setMovieDetails(null);
+          }}
+        >
+          <div
+            className="bg-gray-800 rounded-xl w-full max-w-4xl shadow-2xl relative my-4 sm:my-8"
+            onClick={(e) => e.stopPropagation()} // Prevent clicks inside modal from closing it
+          >
             <button
               onClick={() => {
                 setShowDetailsModal(false);
@@ -280,8 +352,9 @@ function App() {
                         ) : (
                           <span className="text-sm sm:text-base text-gray-400">
                             {movieDetails.number_of_seasons} Season
-                            {movieDetails.number_of_seasons !== 1 ? "s" : ""} •{" "}
-                            {movieDetails.number_of_episodes} Episode
+                            {movieDetails.number_of_seasons !== 1
+                              ? "s"
+                              : ""} • {movieDetails.number_of_episodes} Episode
                             {movieDetails.number_of_episodes !== 1 ? "s" : ""}
                           </span>
                         )}
@@ -336,6 +409,101 @@ function App() {
                               ))}
                             </div>
                           </div>
+                        )}
+                      </div>
+
+                      {/* Add Budget and Revenue Section (for both movies and TV shows) */}
+                      <div className="flex flex-wrap justify-center sm:justify-start gap-4 text-sm sm:text-base">
+                        {mediaType === "movie" ? (
+                          // Movie financial details
+                          <>
+                            {movieDetails.budget > 0 && (
+                              <div className="flex items-center gap-2 bg-gray-700/30 px-3 py-1.5 rounded-lg">
+                                <span className="text-gray-300">Budget:</span>
+                                <span className="text-accent font-medium">
+                                  ${(movieDetails.budget / 1000000).toFixed(1)}M
+                                </span>
+                              </div>
+                            )}
+                            {movieDetails.revenue > 0 && (
+                              <div className="flex items-center gap-2 bg-gray-700/30 px-3 py-1.5 rounded-lg">
+                                <span className="text-gray-300">
+                                  Box Office:
+                                </span>
+                                <span
+                                  className={`font-medium ${
+                                    movieDetails.revenue > movieDetails.budget
+                                      ? "text-green-400"
+                                      : "text-red-400"
+                                  }`}
+                                >
+                                  ${(movieDetails.revenue / 1000000).toFixed(1)}
+                                  M
+                                </span>
+                              </div>
+                            )}
+                            {movieDetails.budget > 0 &&
+                              movieDetails.revenue > 0 && (
+                                <div className="flex items-center gap-2 bg-gray-700/30 px-3 py-1.5 rounded-lg">
+                                  <span className="text-gray-300">ROI:</span>
+                                  <span
+                                    className={`font-medium ${
+                                      movieDetails.revenue > movieDetails.budget
+                                        ? "text-green-400"
+                                        : "text-red-400"
+                                    }`}
+                                  >
+                                    {(
+                                      ((movieDetails.revenue -
+                                        movieDetails.budget) /
+                                        movieDetails.budget) *
+                                      100
+                                    ).toFixed(1)}
+                                    %
+                                  </span>
+                                </div>
+                              )}
+                          </>
+                        ) : (
+                          // TV Show financial details
+                          <>
+                            {movieDetails.episode_run_time?.length > 0 && (
+                              <div className="flex items-center gap-2 bg-gray-700/30 px-3 py-1.5 rounded-lg">
+                                <span className="text-gray-300">
+                                  Episode Length:
+                                </span>
+                                <span className="text-accent font-medium">
+                                  {movieDetails.episode_run_time[0]} min
+                                </span>
+                              </div>
+                            )}
+                            {movieDetails.networks?.length > 0 && (
+                              <div className="flex items-center gap-2 bg-gray-700/30 px-3 py-1.5 rounded-lg">
+                                <span className="text-gray-300">Network:</span>
+                                <span className="text-accent font-medium">
+                                  {movieDetails.networks
+                                    .map((network) => network.name)
+                                    .join(", ")}
+                                </span>
+                              </div>
+                            )}
+                            {movieDetails.type && (
+                              <div className="flex items-center gap-2 bg-gray-700/30 px-3 py-1.5 rounded-lg">
+                                <span className="text-gray-300">Type:</span>
+                                <span className="text-accent font-medium">
+                                  {movieDetails.type}
+                                </span>
+                              </div>
+                            )}
+                            {movieDetails.in_production && (
+                              <div className="flex items-center gap-2 bg-gray-700/30 px-3 py-1.5 rounded-lg">
+                                <span className="text-gray-300">Status:</span>
+                                <span className="text-green-400 font-medium">
+                                  Currently Airing
+                                </span>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -397,20 +565,57 @@ function App() {
     <div className="container mx-auto px-4 mb-8">
       <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-gray-700/50">
         {/* Filter Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div className="flex items-center gap-2">
             <span className="text-xl">🎬</span>
             <h3 className="text-lg font-semibold text-white">Filter Movies</h3>
           </div>
-          <button
-            onClick={() => {
-              setYearRange([1900, new Date().getFullYear()]);
-              setRatingRange([0, 10]);
-            }}
-            className="text-sm px-4 py-2 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors text-gray-300 hover:text-white"
-          >
-            Reset Filters
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {mediaType === "movie" && (
+              <>
+                <button
+                  onClick={() =>
+                    setSortBy(sortBy === "topEarner" ? "none" : "topEarner")
+                  }
+                  className={`text-sm px-4 py-2 rounded-lg transition-colors ${
+                    sortBy === "topEarner"
+                      ? "bg-green-500/90 text-white"
+                      : "bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>💰</span>
+                    Top Earners
+                  </span>
+                </button>
+                <button
+                  onClick={() =>
+                    setSortBy(sortBy === "topLoser" ? "none" : "topLoser")
+                  }
+                  className={`text-sm px-4 py-2 rounded-lg transition-colors ${
+                    sortBy === "topLoser"
+                      ? "bg-red-500/90 text-white"
+                      : "bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>📉</span>
+                    Top Losers
+                  </span>
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => {
+                setYearRange([1900, new Date().getFullYear()]);
+                setRatingRange([0, 10]);
+                setSortBy("none");
+              }}
+              className="text-sm px-4 py-2 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors text-gray-300 hover:text-white"
+            >
+              Reset Filters
+            </button>
+          </div>
         </div>
 
         {/* Filter Controls */}
@@ -550,7 +755,130 @@ function App() {
     </div>
   );
 
-  // Update the main content section
+  // Add new useEffect for scroll to top behavior
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentPage]);
+
+  // Update the Pagination component to include a small delay before page change
+  const Pagination = () => {
+    const handlePageChange = (newPage) => {
+      if (newPage === currentPage) return;
+
+      // First scroll to top
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
+      // Then change the page after a small delay
+      setTimeout(() => {
+        setCurrentPage(newPage);
+      }, 100);
+    };
+
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    return (
+      <div className="flex justify-center items-center gap-2 mt-8 mb-8">
+        <button
+          onClick={() => handlePageChange(1)}
+          disabled={currentPage === 1}
+          className={`px-3 py-1 rounded-lg ${
+            currentPage === 1
+              ? "bg-gray-700/30 text-gray-500 cursor-not-allowed"
+              : "bg-gray-700/50 text-white hover:bg-accent/80"
+          }`}
+        >
+          «
+        </button>
+        <button
+          onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+          className={`px-3 py-1 rounded-lg ${
+            currentPage === 1
+              ? "bg-gray-700/30 text-gray-500 cursor-not-allowed"
+              : "bg-gray-700/50 text-white hover:bg-accent/80"
+          }`}
+        >
+          ‹
+        </button>
+
+        {startPage > 1 && (
+          <>
+            <button
+              onClick={() => handlePageChange(1)}
+              className="px-3 py-1 rounded-lg bg-gray-700/50 text-white hover:bg-accent/80"
+            >
+              1
+            </button>
+            {startPage > 2 && <span className="text-gray-500">...</span>}
+          </>
+        )}
+
+        {Array.from(
+          { length: endPage - startPage + 1 },
+          (_, i) => startPage + i
+        ).map((page) => (
+          <button
+            key={page}
+            onClick={() => handlePageChange(page)}
+            className={`px-3 py-1 rounded-lg ${
+              currentPage === page
+                ? "bg-accent text-white"
+                : "bg-gray-700/50 text-white hover:bg-accent/80"
+            }`}
+          >
+            {page}
+          </button>
+        ))}
+
+        {endPage < totalPages && (
+          <>
+            {endPage < totalPages - 1 && (
+              <span className="text-gray-500">...</span>
+            )}
+            <button
+              onClick={() => handlePageChange(totalPages)}
+              className="px-3 py-1 rounded-lg bg-gray-700/50 text-white hover:bg-accent/80"
+            >
+              {totalPages}
+            </button>
+          </>
+        )}
+
+        <button
+          onClick={() =>
+            handlePageChange(Math.min(totalPages, currentPage + 1))
+          }
+          disabled={currentPage === totalPages}
+          className={`px-3 py-1 rounded-lg ${
+            currentPage === totalPages
+              ? "bg-gray-700/30 text-gray-500 cursor-not-allowed"
+              : "bg-gray-700/50 text-white hover:bg-accent/80"
+          }`}
+        >
+          ›
+        </button>
+        <button
+          onClick={() => handlePageChange(totalPages)}
+          disabled={currentPage === totalPages}
+          className={`px-3 py-1 rounded-lg ${
+            currentPage === totalPages
+              ? "bg-gray-700/30 text-gray-500 cursor-not-allowed"
+              : "bg-gray-700/50 text-white hover:bg-accent/80"
+          }`}
+        >
+          »
+        </button>
+      </div>
+    );
+  };
+
+  // Update the main content section to include pagination
   const mainContent = (
     <main className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -575,6 +903,7 @@ function App() {
           {filteredMovies.map((movie) => movieCard(movie))}
         </div>
       )}
+      {!isLoading && filteredMovies.length > 0 && <Pagination />}
     </main>
   );
 
@@ -603,9 +932,18 @@ function App() {
       <header className="bg-gray-900/80 backdrop-blur-md sticky top-0 z-40 border-b border-gray-700/30">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-4">
-            <h1 className="text-3xl font-bold text-white tracking-tight">
-              Movie<span className="text-accent">DB</span>
-            </h1>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setActiveSection("trending");
+                  setCurrentPage(1);
+                }}
+                className="text-3xl font-bold text-white tracking-tight hover:opacity-80 transition-opacity"
+              >
+                Screen<span className="text-accent">ology</span>
+              </button>
+            </div>
             <div className="flex items-center gap-4">
               <div className="flex gap-2 p-1 bg-gray-800/30 backdrop-blur-sm rounded-lg border border-gray-700/30">
                 {["movie", "tv"].map((type) => (
