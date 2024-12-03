@@ -200,31 +200,31 @@ function App() {
     fetchMovieDetails(movie.id);
   };
 
-  // Add this new component for movie details modal
+  // Update the movie details modal component
   const movieDetailsModal = (
     <>
       {showDetailsModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-gray-800 rounded-xl max-w-4xl w-full shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-gray-800 rounded-xl w-full max-w-4xl shadow-2xl relative my-4 sm:my-8">
             <button
               onClick={() => {
                 setShowDetailsModal(false);
                 setSelectedMovie(null);
                 setMovieDetails(null);
               }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white z-10"
+              className="absolute top-2 right-2 sm:top-4 sm:right-4 text-gray-400 hover:text-white z-10 p-2"
             >
               ✕
             </button>
 
             {isLoading || !movieDetails ? (
-              <div className="h-96 flex items-center justify-center">
+              <div className="h-72 sm:h-96 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-accent"></div>
               </div>
             ) : (
               <div className="relative">
                 {/* Backdrop Image */}
-                <div className="h-64 relative overflow-hidden rounded-t-xl">
+                <div className="h-36 sm:h-48 md:h-64 relative overflow-hidden rounded-t-xl">
                   <img
                     src={`https://image.tmdb.org/t/p/original${movieDetails.backdrop_path}`}
                     alt={
@@ -238,10 +238,10 @@ function App() {
                 </div>
 
                 {/* Content */}
-                <div className="p-6 -mt-16 relative">
-                  <div className="flex gap-6">
+                <div className="p-3 sm:p-4 md:p-6 -mt-6 sm:-mt-8 md:-mt-16 relative">
+                  <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                     {/* Poster */}
-                    <div className="w-48 flex-shrink-0">
+                    <div className="w-24 sm:w-32 md:w-48 mx-auto sm:mx-0 flex-shrink-0">
                       <img
                         src={`https://image.tmdb.org/t/p/w500${movieDetails.poster_path}`}
                         alt={
@@ -249,22 +249,23 @@ function App() {
                             ? movieDetails.title
                             : movieDetails.name
                         }
-                        className="rounded-lg shadow-lg"
+                        className="rounded-lg shadow-lg w-full"
                       />
                     </div>
 
                     {/* Info */}
-                    <div className="flex-1">
-                      <h2 className="text-3xl font-bold mb-2">
+                    <div className="flex-1 space-y-3 sm:space-y-4">
+                      <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-center sm:text-left">
                         {mediaType === "movie"
                           ? movieDetails.title
                           : movieDetails.name}
                       </h2>
-                      <div className="flex items-center gap-4 mb-4">
+
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-4">
                         <span className="text-accent font-semibold">
                           {movieDetails.vote_average.toFixed(1)}
                         </span>
-                        <span className="text-gray-400">
+                        <span className="text-sm sm:text-base text-gray-400">
                           {mediaType === "movie"
                             ? new Date(movieDetails.release_date).getFullYear()
                             : `${new Date(
@@ -272,27 +273,26 @@ function App() {
                               ).getFullYear()} - ${movieDetails.status}`}
                         </span>
                         {mediaType === "movie" ? (
-                          <span className="text-gray-400">
+                          <span className="text-sm sm:text-base text-gray-400">
                             {Math.floor(movieDetails.runtime / 60)}h{" "}
                             {movieDetails.runtime % 60}m
                           </span>
                         ) : (
-                          <span className="text-gray-400">
+                          <span className="text-sm sm:text-base text-gray-400">
                             {movieDetails.number_of_seasons} Season
-                            {movieDetails.number_of_seasons !== 1
-                              ? "s"
-                              : ""} • {movieDetails.number_of_episodes} Episode
+                            {movieDetails.number_of_seasons !== 1 ? "s" : ""} •{" "}
+                            {movieDetails.number_of_episodes} Episode
                             {movieDetails.number_of_episodes !== 1 ? "s" : ""}
                           </span>
                         )}
                       </div>
 
                       {/* Genres */}
-                      <div className="flex gap-2 mb-4">
+                      <div className="flex flex-wrap justify-center sm:justify-start gap-2">
                         {movieDetails.genres.map((genre) => (
                           <span
                             key={genre.id}
-                            className="px-3 py-1 bg-gray-700 rounded-full text-sm"
+                            className="px-2 sm:px-3 py-1 bg-gray-700 rounded-full text-xs sm:text-sm"
                           >
                             {genre.name}
                           </span>
@@ -300,14 +300,14 @@ function App() {
                       </div>
 
                       {/* Overview */}
-                      <p className="text-gray-300 mb-4">
+                      <p className="text-sm sm:text-base text-gray-300 text-center sm:text-left line-clamp-4 sm:line-clamp-none">
                         {movieDetails.overview}
                       </p>
 
                       {/* Cast & Crew */}
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {movieDetails.director && (
-                          <p className="text-gray-400">
+                          <p className="text-sm sm:text-base text-gray-400 text-center sm:text-left">
                             <span className="text-white font-semibold">
                               {mediaType === "movie"
                                 ? "Director: "
@@ -322,14 +322,14 @@ function App() {
                         )}
                         {movieDetails.cast.length > 0 && (
                           <div>
-                            <h3 className="text-white font-semibold mb-2">
+                            <h3 className="text-white font-semibold mb-2 text-center sm:text-left">
                               Cast
                             </h3>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap justify-center sm:justify-start gap-2">
                               {movieDetails.cast.map((actor) => (
                                 <span
                                   key={actor.id}
-                                  className="px-3 py-1 bg-gray-700 rounded-full text-sm"
+                                  className="px-2 sm:px-3 py-1 bg-gray-700 rounded-full text-xs sm:text-sm"
                                 >
                                   {actor.name}
                                 </span>
