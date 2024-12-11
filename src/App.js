@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
 import "./App.css";
+import { Routes, Route, Link } from "react-router-dom";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import Disclaimer from "./pages/Disclaimer";
 
 const API_KEY = "9e8cfe2baf80459dbf937a0cb723d861";
 const API_BASE_URL = "https://api.themoviedb.org/3";
@@ -909,82 +913,119 @@ function App() {
 
   // Update the footer component
   const footer = (
-    <footer className="bg-gray-900/80 backdrop-blur-md border-t border-gray-700/30 py-4">
-      <div className="container mx-auto px-4 text-center">
-        <p className="text-gray-400 text-sm">
-          Created By{" "}
-          <a
-            href="https://github.com/rohan7408"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent font-medium hover:text-accent/80 transition-colors cursor-pointer"
-          >
-            Rohan
-          </a>
-        </p>
+    <footer className="bg-gray-900/80 backdrop-blur-md border-t border-gray-700/30 py-6">
+      <div className="container mx-auto px-4">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="text-center md:text-left">
+            <p className="text-gray-400 text-sm">
+              Created By{" "}
+              <a
+                href="https://github.com/rohan7408"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent font-medium hover:text-accent/80 transition-colors cursor-pointer"
+              >
+                Rohan
+              </a>
+            </p>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-400">
+            <Link
+              to="/privacy-policy"
+              className="hover:text-accent transition-colors"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              to="/terms-and-conditions"
+              className="hover:text-accent transition-colors"
+            >
+              Terms & Conditions
+            </Link>
+            <Link
+              to="/disclaimer"
+              className="hover:text-accent transition-colors"
+            >
+              Disclaimer
+            </Link>
+          </div>
+        </div>
       </div>
     </footer>
   );
 
   // Combine all sections into one organized layout
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col">
-      <header className="bg-gray-900/80 backdrop-blur-md sticky top-0 z-40 border-b border-gray-700/30">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setActiveSection("trending");
-                  setCurrentPage(1);
-                }}
-                className="text-3xl font-bold text-white tracking-tight hover:opacity-80 transition-opacity"
-              >
-                Screen<span className="text-accent">ology</span>
-              </button>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex gap-2 p-1 bg-gray-800/30 backdrop-blur-sm rounded-lg border border-gray-700/30">
-                {["movie", "tv"].map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setMediaType(type)}
-                    className={`px-4 py-2 rounded-lg transition-all duration-300 ${
-                      mediaType === type
-                        ? "bg-accent/90 text-white shadow-md"
-                        : "text-gray-300 hover:text-white hover:bg-gray-700/30"
-                    }`}
-                  >
-                    {type === "movie" ? "Movies" : "TV Shows"}
-                  </button>
-                ))}
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col">
+            <header className="bg-gray-900/80 backdrop-blur-md sticky top-0 z-40 border-b border-gray-700/30">
+              <div className="container mx-auto px-4 py-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setActiveSection("trending");
+                        setCurrentPage(1);
+                      }}
+                      className="flex items-center hover:opacity-80 transition-opacity"
+                    >
+                      <span className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-accent to-accent/70 bg-clip-text text-transparent">
+                        Screenology
+                      </span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex gap-2 p-1 bg-gray-800/30 backdrop-blur-sm rounded-lg border border-gray-700/30">
+                      {["movie", "tv"].map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => setMediaType(type)}
+                          className={`px-4 py-2 rounded-lg transition-all duration-300 ${
+                            mediaType === type
+                              ? "bg-accent/90 text-white shadow-md"
+                              : "text-gray-300 hover:text-white hover:bg-gray-700/30"
+                          }`}
+                        >
+                          {type === "movie" ? "Movies" : "TV Shows"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="relative mt-4">
+                  <input
+                    type="text"
+                    placeholder={`Search ${
+                      mediaType === "tv" ? "TV shows" : "movies"
+                    }...`}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full p-4 rounded-xl bg-gray-800/30 backdrop-blur-sm border border-gray-700/30 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all placeholder-gray-500 shadow-lg"
+                  />
+                </div>
               </div>
+            </header>
+
+            <div className="flex-1">
+              {sectionNavigation}
+              {filterBar}
+              {mainContent}
             </div>
-          </div>
-          <div className="relative mt-4">
-            <input
-              type="text"
-              placeholder={`Search ${
-                mediaType === "tv" ? "TV shows" : "movies"
-              }...`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full p-4 rounded-xl bg-gray-800/30 backdrop-blur-sm border border-gray-700/30 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all placeholder-gray-500 shadow-lg"
-            />
-          </div>
-        </div>
-      </header>
 
-      <div className="flex-1">
-        {sectionNavigation}
-        {filterBar}
-        {mainContent}
-      </div>
-
-      {footer}
-      {movieDetailsModal}
-    </div>
+            {footer}
+            {movieDetailsModal}
+          </div>
+        }
+      />
+      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+      <Route path="/disclaimer" element={<Disclaimer />} />
+    </Routes>
   );
 }
 
