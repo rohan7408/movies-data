@@ -54,7 +54,7 @@ function PrivacyPolicy() {
             </h2>
             <p>
               If you have any questions about this Privacy Policy, please
-              contact us at [your contact email].
+              contact us at inc.roel@gmail.com
             </p>
           </section>
         </div>
